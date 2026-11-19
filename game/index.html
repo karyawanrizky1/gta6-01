@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solmara Bay — Open-World Crime Game</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a2436; font-family: 'Segoe UI', system-ui, sans-serif; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .hud { position: fixed; z-index: 5; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.8); user-select: none; pointer-events: none; }
+  #hud-tl { top: 12px; left: 14px; }
+  #hud-tl .row { margin-bottom: 6px; font-weight: 700; font-size: 15px; letter-spacing: .5px; }
+  #stars { font-size: 22px; letter-spacing: 3px; color: #ffd23f; }
+  #stars .off { color: rgba(255,255,255,.35); }
+  #hpbar { width: 170px; height: 12px; background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.6); border-radius: 6px; overflow: hidden; }
+  #hpfill { height: 100%; width: 100%; background: linear-gradient(90deg,#37d67a,#a8e063); }
+  #hud-tr { top: 12px; right: 14px; text-align: right; }
+  #minimap { width: 196px; height: 150px; background: rgba(8,14,24,.72); border: 2px solid rgba(255,255,255,.75); border-radius: 8px; }
+  #clock { font-size: 15px; font-weight: 700; margin-top: 4px; }
+  #objective { left: 50%; transform: translateX(-50%); top: 12px; max-width: 560px; text-align: center;
+    background: rgba(8,14,24,.66); border: 1px solid rgba(255,255,255,.35); border-radius: 8px; padding: 7px 16px; font-size: 15px; font-weight: 600; }
+  #objective .t { color: #ffd23f; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
+  #speedo { right: 16px; bottom: 14px; text-align: right; font-size: 30px; font-weight: 800; }
+  #speedo small { font-size: 13px; font-weight: 600; }
+  #ammo { left: 16px; bottom: 14px; font-size: 16px; font-weight: 700; }
+  #toast { left: 50%; transform: translateX(-50%); bottom: 86px; font-size: 17px; font-weight: 700; color: #ffe9a8; text-align: center; }
+  #hint { left: 50%; transform: translateX(-50%); bottom: 8px; font-size: 12px; color: rgba(255,255,255,.75); text-align: center; }
+  #cross { left: 50%; top: 50%; transform: translate(-50%,-50%); font-size: 20px; color: rgba(255,255,255,.9); display: none; }
+  .menu { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(160deg, rgba(10,18,34,.82), rgba(60,30,10,.55)); color: #fff; }
+  .menu .box { max-width: 620px; padding: 34px 44px; text-align: center; background: rgba(8,14,24,.78);
+    border: 1px solid rgba(255,210,63,.55); border-radius: 14px; }
+  .menu h1 { margin: 0 0 4px; font-size: 46px; letter-spacing: 4px; color: #ffd23f; }
+  .menu h2 { margin: 0 0 10px; font-size: 26px; color: #ffd23f; }
+  .menu p { font-size: 15px; line-height: 1.55; color: #e8ecf2; }
+  .menu .sub { color: #9fd8ff; letter-spacing: 3px; font-size: 13px; font-weight: 700; text-transform: uppercase; }
+  .menu button { pointer-events: auto; cursor: pointer; margin: 6px; padding: 11px 26px; font-size: 16px; font-weight: 700;
+    color: #122; background: #ffd23f; border: none; border-radius: 8px; }
+  .menu button.alt { background: transparent; color: #fff; border: 2px solid #fff; }
+  .menu .keys { text-align: left; font-size: 13.5px; line-height: 1.8; color: #dfe6ee; }
+  .hidden { display: none !important; }
+</style>
+<script type="importmap">{"imports": {"three": "./vendor/three/three.module.min.js"}}</script>
+</head>
+<body>
+<canvas id="game" aria-label="Solmara Bay: an open-world crime game. Drive, steal cars, do missions and dodge the police."></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+<div id="hud-tl" class="hud"><div class="row"><span id="cash">$0</span> &nbsp;·&nbsp; <span id="mission-label">FREE ROAM</span></div>
+  <div id="hpbar"><div id="hpfill"></div></div>
+  <div id="stars"><span class="off">★</span><span class="off">★</span><span class="off">★</span></div></div>
+<div id="hud-tr" class="hud"><canvas id="minimap" width="392" height="300"></canvas><div id="clock">08:00 · SOLMARA BAY</div></div>
+<div id="objective" class="hud"><div class="t" id="obj-title">Free roam</div><div id="obj-text">Explore Solmara Bay. Press M for missions, E near a car to drive it.</div></div>
+<div id="speedo" class="hud"><span id="speed">0</span> <small>km/h</small><div style="font-size:13px" id="carname"></div></div>
+<div id="ammo" class="hud">🔫 <span id="ammo-n">24</span> &nbsp;·&nbsp; <span id="wanted-note"></span></div>
+<div id="toast" class="hud"></div>
+<div id="hint" class="hud">WASD move / drive · Shift run · E enter car · F punch · Click shoot · Space jump / handbrake · P pause · M missions · R reload</div>
+<div id="cross" class="hud">+</div>
+<div id="menu-title" class="menu"><div class="box">
+  <div class="sub">An original open-world crime game</div>
+  <h1>SOLMARA BAY</h1>
+  <p>Jay Kessler came back to Solmara Bay broke, with a busted delivery van and a
+  debt to the wrong people. One harbour job at a time, he is going to buy his way out —
+  or get caught trying. Drive the coast, steal what you need, lose the cops, finish the jobs.</p>
+  <button id="btn-new">NEW GAME</button><button id="btn-continue" class="alt hidden">CONTINUE</button><button id="btn-how" class="alt">HOW TO PLAY</button>
+  <p style="font-size:12px;color:#9fb0c3">Keyboard + mouse · Desktop browser · Your progress saves on this computer</p>
+</div></div>
+<div id="menu-how" class="menu hidden"><div class="box"><h2>HOW TO PLAY</h2>
+  <div class="keys">
+  <b>W A S D</b> — walk / drive &nbsp;·&nbsp; <b>Shift</b> — run<br>
+  <b>Mouse drag</b> — look around &nbsp;·&nbsp; <b>Space</b> — jump / handbrake<br>
+  <b>E</b> — enter or leave the nearest car (stealing in front of cops raises your wanted level)<br>
+  <b>F</b> — punch &nbsp;·&nbsp; <b>Click</b> — shoot your pistol &nbsp;·&nbsp; <b>R</b> — reload<br>
+  <b>M</b> — mission list &nbsp;·&nbsp; <b>P / Esc</b> — pause &amp; save &nbsp;·&nbsp; <b>U</b> — mute sound<br>
+  Crimes raise your wanted stars. Hide from the police and the heat fades. At 3 stars the
+  Solmara Bay Police set up roadblocks. Finish missions to earn cash and unlock the next one.</div>
+  <button id="btn-how-back">BACK</button></div></div>
+<div id="menu-missions" class="menu hidden"><div class="box"><h2>MISSIONS — JAY KESSLER</h2><p id="mission-list"></p>
+  <button id="btn-missions-back">BACK TO GAME</button></div></div>
+<div id="menu-pause" class="menu hidden"><div class="box"><h2>PAUSED</h2>
+  <p id="pause-stats"></p>
+  <button id="btn-resume">RESUME</button><button id="btn-save" class="alt">SAVE GAME</button><button id="btn-quit" class="alt">QUIT TO TITLE</button></div></div>
+<div id="menu-over" class="menu hidden"><div class="box"><h2 id="over-title">BUSTED</h2><p id="over-text"></p>
+  <button id="btn-retry">TRY AGAIN</button><button id="btn-over-title" class="alt">TITLE SCREEN</button></div></div>
+<div id="menu-done" class="menu hidden"><div class="box"><h2>MISSION COMPLETE</h2><p id="done-text"></p>
+  <button id="btn-done">CONTINUE</button></div></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
